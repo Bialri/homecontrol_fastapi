@@ -10,7 +10,7 @@ from .config import FastApiSettings
 
 settings = FastApiSettings()
 
-cors_origins = ['http://localhost:5173',]
+cors_origins = ['*',]
 
 app = FastAPI(
     **settings.dict()
