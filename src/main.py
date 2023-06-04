@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi_jwt_auth.exceptions import AuthJWTException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.buttons.router import router as buttons_router
 from src.auth.router import router as auth_router
@@ -9,8 +10,18 @@ from .config import FastApiSettings
 
 settings = FastApiSettings()
 
+cors_origins = ['http://localhost:5173',]
+
 app = FastAPI(
     **settings.dict()
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.openapi = custom_openapi(app)
