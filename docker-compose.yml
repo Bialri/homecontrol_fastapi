@@ -21,4 +21,4 @@ services:
     build: .
     restart: on-failure
     ports:
-      - '8000:8000'
+      - '8003:8000'
