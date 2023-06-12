@@ -8,12 +8,12 @@ services:
       - '.env'
 
      # FOR DEVELOPMENT
-     #ports:
-     # - '3306:3306'
+    ports:
+      - '3306:3306'
 
      # FOR DEPLOY
-    expose:
-      - 3306
+#    expose:
+#      - 3306
     volumes:
       - ./mysql_data:/var/lib/mysql
 
@@ -22,3 +22,10 @@ services:
     restart: on-failure
     ports:
       - '8003:8000'
+
+  daemon:
+    image: script_daemon:0.0.1
+    command: bash -c "python main.py -s 2"
+    restart: always
+    environment:
+      - DB_URL=mysql+aiomysql://user:Tgb123yhn123@db:3306/db

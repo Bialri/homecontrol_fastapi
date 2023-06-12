@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.buttons.router import router as buttons_router
 from src.auth.router import router as auth_router
-from src.openapi import custom_openapi
+from src.scripts.router import router as scripts_router
+from .openapi import custom_openapi
 from .config import FastApiSettings
 
 settings = FastApiSettings()
@@ -41,3 +42,4 @@ app.include_router(auth_router)
 
 app.include_router(buttons_router)
 
+app.include_router(scripts_router)

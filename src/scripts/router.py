@@ -1,0 +1,181 @@
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi_jwt_auth import AuthJWT
+from sqlalchemy.orm import selectinload
+
+from src.database import get_async_session
+from .models import Device, Action, ScriptAction, Script, ActionsAssociation
+from .schemas import (DevicesResponseSchema, DeviceCreateSchema, ActionResponseSchema,
+                      ActionCreateSchema, ScriptActionResponseSchema, ScriptActionCreateSchema,
+                      ScriptResponseSchema, ScriptCreateSchema)
+from src.auth.models import User
+from src.config import SCRIPTS_ADD_SECRET
+
+router = APIRouter(
+    prefix='/scripts',
+    tags=['Scripts']
+)
+
+
+@router.get('/devices')
+async def get_devices(session: AsyncSession = Depends(get_async_session),
+                      authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = select(Device)
+    result = await session.execute(query)
+    response = [DevicesResponseSchema.from_orm(device[0]) for device in result.all()]
+    return {'status': 'Success get',
+            'data': response,
+            'detail': ''}
+
+
+@router.post('/devices')
+async def create_device(new_device: DeviceCreateSchema,
+                        response_status: Response,
+                        session: AsyncSession = Depends(get_async_session),
+                        authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    if SCRIPTS_ADD_SECRET != new_device.secret:
+        response_status.status_code = status.HTTP_403_FORBIDDEN
+        return {'status': 'Failed create',
+                'data': '',
+                'detail': 'Wrong Secret'}
+    device_args = new_device.dict()
+    device_args.pop('secret')
+    device = Device(**device_args)
+    session.add(device)
+    await session.commit()
+    response = DevicesResponseSchema.from_orm(device).dict()
+    return {'status': 'Success create',
+            'data': response,
+            'detail': ''}
+
+
+@router.get('/actions/{device_id}')
+async def get_device_actions(device_id: int,
+                             response_status: Response,
+                             session: AsyncSession = Depends(get_async_session),
+                             authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = select(Action).where(Action.device_id == device_id)
+    result = await session.execute(query)
+    result = result.all()
+    if len(result) == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        return {'status': 'Failed get',
+                'data': '',
+                'detail': 'Wrong device id'}
+    response = [ActionResponseSchema.from_orm(action[0]) for action in result]
+    return {'status': 'Success get',
+            'data': response,
+            'detail': ''}
+
+
+@router.post('/actions')
+async def create_device(new_action: ActionCreateSchema,
+                        response_status: Response,
+                        session: AsyncSession = Depends(get_async_session),
+                        authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    if SCRIPTS_ADD_SECRET != new_action.secret:
+        response_status.status_code = status.HTTP_403_FORBIDDEN
+        return {'status': 'Failed create',
+                'data': '',
+                'detail': 'Wrong Secret'}
+    action_args = new_action.dict()
+    action_args.pop('secret')
+    action = Action(**action_args)
+    session.add(action)
+    await session.commit()
+    response = ActionResponseSchema.from_orm(action).dict()
+    return {'status': 'Success create',
+            'data': response,
+            'detail': ''}
+
+
+@router.get('/script_actions/{script_id}')
+async def get_script_actions(script_id: int,
+                             response_status: Response,
+                             session: AsyncSession = Depends(get_async_session),
+                             authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = select(Script).options(selectinload(Script.actions)).where(Script.id == script_id)
+    result = await session.execute(query)
+    result = result.all()
+    if len(result) == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        return {'status': 'Failed get',
+                'data': '',
+                'detail': 'Wrong device id'}
+    result = result[0][0]
+    script_actions = result.actions
+    response = [ScriptActionResponseSchema.from_orm(script_action) for script_action in script_actions]
+    return {'status': 'Success get',
+            'data': response,
+            'detail': ''}
+
+
+@router.post('/script_actions')
+async def create_device(new_script_action: ScriptActionCreateSchema,
+                        response_status: Response,
+                        session: AsyncSession = Depends(get_async_session),
+                        authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    subject = authorize.get_jwt_subject()
+    user = await session.execute(select(User).where(User.username == subject))
+    user = user.scalar()
+    script = select(Script).where(Script.id == new_script_action.script_id, Script.owner_id == user.id)
+    script = await session.execute(script)
+    script = script.all()
+    if len(script) == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        return {'status': 'Failed create',
+                'data': '',
+                'detail': 'Wrong script_id'}
+    script = script[0][0]
+    script_action_args = new_script_action.dict()
+    script_action_args.pop('script_id')
+    script_action = ScriptAction(**script_action_args)
+    session.add(script_action)
+    await session.commit()
+    association = ActionsAssociation(script_action_id=script_action.id, script_id=script.id)
+    session.add(association)
+    await session.commit()
+    response = ScriptActionResponseSchema.from_orm(script_action).dict()
+    return {'status': 'Success create',
+            'data': response,
+            'detail': ''}
+
+
+@router.get('/script')
+async def get_script(session: AsyncSession = Depends(get_async_session),
+                     authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    subject = authorize.get_jwt_subject()
+    user = await session.execute(select(User).where(User.username == subject))
+    user = user.scalar()
+    query = select(Script).where(Script.owner_id == user.id)
+    result = await session.execute(query)
+    result = result.all()
+    response = [ScriptResponseSchema.from_orm(script[0]) for script in result]
+    return {'status': 'Success get',
+            'data': response,
+            'detail': ''}
+
+
+@router.post('/script')
+async def create_script(new_script: ScriptCreateSchema,
+                        session: AsyncSession = Depends(get_async_session),
+                        authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    subject = authorize.get_jwt_subject()
+    user = await session.execute(select(User).where(User.username == subject))
+    user = user.scalar()
+    script = Script(**new_script.dict(), owner_id=user.id)
+    session.add(script)
+    await session.commit()
+    response = ScriptResponseSchema.from_orm(script).dict()
+    return {'status': 'Success create',
+            'data': response,
+            'detail': ''}
