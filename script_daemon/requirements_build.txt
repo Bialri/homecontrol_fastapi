@@ -1,0 +1,7 @@
+aiomysql==0.2.0
+greenlet==2.0.2
+PyMySQL==1.0.3
+python-dotenv==1.0.0
+SQLAlchemy==2.0.16
+typing_extensions==4.6.3
+cryptography==41.0.1
