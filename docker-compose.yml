@@ -24,8 +24,7 @@ services:
       - '8003:8000'
 
   daemon:
-    image: bialri/script_daemon
-    command: bash -c "python main.py -s 2"
+    build: script_daemon/.
     restart: always
     env_file:
       - .env
