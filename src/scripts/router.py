@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import select
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_jwt_auth import AuthJWT
 from sqlalchemy.orm import selectinload
@@ -8,7 +8,7 @@ from src.database import get_async_session
 from .models import Device, Action, ScriptAction, Script, ActionsAssociation
 from .schemas import (DevicesResponseSchema, DeviceCreateSchema, ActionResponseSchema,
                       ActionCreateSchema, ScriptActionResponseSchema, ScriptActionCreateSchema,
-                      ScriptResponseSchema, ScriptCreateSchema)
+                      ScriptResponseSchema, ScriptCreateSchema, ScriptActionUpdateSchema)
 from src.auth.models import User
 from src.config import SCRIPTS_ADD_SECRET
 
@@ -58,7 +58,7 @@ async def get_device_actions(device_id: int,
                              session: AsyncSession = Depends(get_async_session),
                              authorize: AuthJWT = Depends()):
     authorize.jwt_required()
-    query = select(Action).where(Action.device_id == device_id)
+    query = select(Action).where(Action.device_type == device_id)
     result = await session.execute(query)
     result = result.all()
     if len(result) == 0:
@@ -145,6 +145,54 @@ async def create_device(new_script_action: ScriptActionCreateSchema,
     response = ScriptActionResponseSchema.from_orm(script_action).dict()
     return {'status': 'Success create',
             'data': response,
+            'detail': ''}
+
+
+@router.patch('/script_actions/{script_action_id}')
+async def update_script_action(script_action_id: int,
+                               updated_script_action: ScriptActionUpdateSchema,
+                               response_status: Response,
+                               session: AsyncSession = Depends(get_async_session),
+                               authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = update(ScriptAction).values(**updated_script_action.dict(exclude_none=True)).where(
+        ScriptAction.id == script_action_id)
+    update_result = await session.execute(query)
+    if update_result.rowcount == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        session.rollback()
+        return {'status': 'Fail update',
+                'data': '',
+                'detail': 'ScriptAction object not found'}
+    await session.commit()
+    response_query = select(ScriptAction).where(ScriptAction.id == script_action_id)
+    response = await session.execute(response_query)
+    response = ScriptActionResponseSchema.from_orm(response.scalar()).dict()
+    return {'status': 'Success update',
+            'data': response,
+            'detail': ''}
+
+
+@router.delete('/script_actions/{script_action_id}')
+async def delete_script_action(script_action_id: int,
+                               response_status: Response,
+                               session: AsyncSession = Depends(get_async_session),
+                               authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = delete(ActionsAssociation).where(ActionsAssociation.script_action_id == script_action_id)
+    asociation_result = await session.execute(query)
+    query = delete(ScriptAction).where(ScriptAction.id == script_action_id)
+    script_action_result = await session.execute(query)
+    await session.commit()
+
+    if asociation_result.rowcount == 0 and script_action_result.rowcount == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        return {'status': 'Failed delete',
+                'data': '',
+                'detail': 'Wrong script_action_id'}
+
+    return {'status': 'Success delete',
+            'data': '',
             'detail': ''}
 
 

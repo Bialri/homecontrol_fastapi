@@ -45,6 +45,11 @@ class ScriptActionCreateSchema(BaseModel):
     action_id: int
     script_id: int
 
+class ScriptActionUpdateSchema(BaseModel):
+    device_id: int | None
+    latency: datetime.timedelta | None
+    action_id: int | None
+    script_id: int | None
 
 class ScriptResponseSchema(BaseModel):
     id: int

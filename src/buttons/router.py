@@ -6,7 +6,7 @@ from fastapi_jwt_auth import AuthJWT
 
 from src.database import get_async_session
 from .models import Button
-from .schemas import ButtonSchema, ButtonUpdateSchema, ButtonWithTokenSchema
+from .schemas import ButtonSchema, ButtonUpdateSchema, ButtonWithTokenSchema, ButtonResponseSchema
 from src.auth.models import User
 
 router = APIRouter(
@@ -25,7 +25,7 @@ async def get_all_buttons(session: AsyncSession = Depends(get_async_session),
     query = select(Button).where(Button.owner == user)
     result = await session.execute(query)
     result = result.scalars()
-    result = [ButtonSchema.from_orm(btn).dict() for btn in result]
+    result = [ButtonResponseSchema.from_orm(btn).dict() for btn in result]
     return {'status': 'Success get',
             'data': result,
             'detail': ''}
