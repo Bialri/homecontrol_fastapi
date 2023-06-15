@@ -1,5 +1,5 @@
 import os
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 import datetime
 import asyncio
 from sqlalchemy import NullPool, text
@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from instructions import execute_button_action
 import argparse
 
-# load_dotenv()
+load_dotenv()
 
 DATABASE_URL = os.environ.get('DB_URL')
 

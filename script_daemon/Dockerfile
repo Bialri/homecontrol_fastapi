@@ -8,5 +8,5 @@ RUN pip install --no-cache-dir --upgrade -r /app/requirements_build.txt
 
 COPY . /app
 
-CMD ["python", "main.py"]
+CMD ["python","-u","main.py"]
 
