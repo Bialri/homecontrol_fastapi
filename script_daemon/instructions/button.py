@@ -27,11 +27,12 @@ actions = {1: turn_on_button,
 def execute_button_action(action_id: int,
                           device_id: int,
                           session_maker: async_sessionmaker[AsyncSession]):
+    print('about to start')
     try:
         print(f'started {action_id}')
         executed_func = actions[action_id]
         asyncio.run(executed_func(device_id=device_id,
                                   session_maker=session_maker))
         print(f'executed {action_id}')
-    except:
-        pass
+    except Exception as e:
+        print(f'error: {e}')

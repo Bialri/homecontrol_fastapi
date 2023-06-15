@@ -19,6 +19,7 @@ async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit
 async def execute_action(action_id: int,
                          device_id: int,
                          session_maker: async_sessionmaker[AsyncSession]):
+    print(f'prepare to run {action_id} on {device_id}')
     match device_id:
         case 1:
             loop = asyncio.get_event_loop()
