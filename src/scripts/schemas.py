@@ -63,3 +63,8 @@ class ScriptResponseSchema(BaseModel):
 class ScriptCreateSchema(BaseModel):
     name: str
     time: datetime.time
+
+
+class ScriptUpdateSchema(BaseModel):
+    name: str | None
+    time: datetime.time | None

@@ -8,7 +8,8 @@ from src.database import get_async_session
 from .models import Device, Action, ScriptAction, Script, ActionsAssociation
 from .schemas import (DevicesResponseSchema, DeviceCreateSchema, ActionResponseSchema,
                       ActionCreateSchema, ScriptActionResponseSchema, ScriptActionCreateSchema,
-                      ScriptResponseSchema, ScriptCreateSchema, ScriptActionUpdateSchema)
+                      ScriptResponseSchema, ScriptCreateSchema, ScriptActionUpdateSchema,
+                      ScriptUpdateSchema)
 from src.auth.models import User
 from src.config import SCRIPTS_ADD_SECRET
 
@@ -226,6 +227,62 @@ async def create_script(new_script: ScriptCreateSchema,
     response = ScriptResponseSchema.from_orm(script).dict()
     return {'status': 'Success create',
             'data': response,
+            'detail': ''}
+
+
+@router.patch('/script/{script_id}')
+async def update_script_action(script_id: int,
+                               update_script: ScriptUpdateSchema,
+                               response_status: Response,
+                               session: AsyncSession = Depends(get_async_session),
+                               authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = update(Script).values(**update_script.dict(exclude_none=True)).where(
+        Script.id == script_id)
+    update_result = await session.execute(query)
+    if update_result.rowcount == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        session.rollback()
+        return {'status': 'Fail update',
+                'data': '',
+                'detail': 'Script object not found'}
+    await session.commit()
+    response_query = select(Script).where(Script.id == script_id)
+    response = await session.execute(response_query)
+    response = ScriptResponseSchema.from_orm(response.scalar()).dict()
+    return {'status': 'Success update',
+            'data': response,
+            'detail': ''}
+
+
+@router.delete('/script/{script_id}')
+async def delete_script(script_id: int,
+                        response_status: Response,
+                        session: AsyncSession = Depends(get_async_session),
+                        authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = select(ActionsAssociation.script_action_id).where(ActionsAssociation.script_id == script_id)
+    result_select = await session.execute(query)
+    result_select = result_select.all()
+
+    query = delete(ActionsAssociation).where(ActionsAssociation.script_id == script_id)
+    result_asociation = await session.execute(query)
+
+    query = delete(ScriptAction).where(ScriptAction.id
+                                       .in_([script_action_id[0] for script_action_id in result_select]))
+    result_script_actions = await session.execute(query)
+
+    query = delete(Script).where(Script.id == script_id)
+    result_scripts = await session.execute(query)
+    if result_scripts.rowcount == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        await session.rollback()
+        return {'status': 'Failed delete',
+                'data': '',
+                'detail': 'Wrong script_id'}
+    await session.commit()
+    return {'status': 'Success delete',
+            'data': '',
             'detail': ''}
 
 
