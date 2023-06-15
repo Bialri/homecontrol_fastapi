@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi_jwt_auth import AuthJWT
 from sqlalchemy.orm import selectinload
@@ -227,3 +227,10 @@ async def create_script(new_script: ScriptCreateSchema,
     return {'status': 'Success create',
             'data': response,
             'detail': ''}
+
+
+@router.get('/curtime')
+async def get_curtime(session: AsyncSession = Depends(get_async_session)):
+    result = await session.execute(text('SELECT CURTIME()'))
+    print(result.scalar())
+    return ""
