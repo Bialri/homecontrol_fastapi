@@ -18,9 +18,10 @@ async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 async def execute_action(action_id: int,
                          device_id: int,
+                         device_type: int,
                          session_maker: async_sessionmaker[AsyncSession]):
     print(f'prepare to run {action_id} on {device_id}')
-    match device_id:
+    match device_type:
         case 1:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, execute_button_action, action_id, device_id, session_maker)
@@ -28,7 +29,9 @@ async def execute_action(action_id: int,
 
 async def get_current_tasks(session_maker: async_sessionmaker[AsyncSession]) -> list:
     async with session_maker() as session:
-        query = text("""SELECT * FROM script_actions WHERE 
+        query = text("""SELECT script_actions.id, script_actions.action_id, script_actions.device_id, actions.device_type FROM script_actions
+         INNER JOIN actions ON actions.id = script_actions.action_id
+         WHERE 
             (SELECT script_id FROM actions_association_table WHERE 
              actions_association_table.script_action_id = script_actions.id)
             IN 
@@ -44,7 +47,7 @@ async def get_current_tasks(session_maker: async_sessionmaker[AsyncSession]) -> 
 async def main(sleep_time: int = 1):
     result = await get_current_tasks(async_session_maker)
     print(result)
-    await asyncio.gather(*[execute_action(script_action[1], script_action[2],
+    await asyncio.gather(*[execute_action(script_action[1], script_action[2], script_action[3],
                                           async_session_maker) for script_action in result])
     end = datetime.datetime.now().time()
     print(end)
