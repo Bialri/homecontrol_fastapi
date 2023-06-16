@@ -6,7 +6,7 @@ from sqlalchemy import NullPool, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
 from instructions import execute_button_action
-import argparse
+
 
 load_dotenv()
 
@@ -36,7 +36,7 @@ async def get_current_tasks(session_maker: async_sessionmaker[AsyncSession]) -> 
              actions_association_table.script_action_id = script_actions.id)
             IN 
             (SELECT scripts.id FROM scripts 
-            WHERE SEC_TO_TIME((TIME_TO_SEC(CURTIME()) DIV 60) * 60) = ADDTIME(TIMEDIFF(script_actions.latency,'1970-01-01 00:00:00'), scripts.time))""")
+            WHERE SEC_TO_TIME((TIME_TO_SEC(CURTIME()) DIV 5) * 5) = ADDTIME(TIMEDIFF(script_actions.latency,'1970-01-01 00:00:00'), scripts.time))""")
 
         # query = select(Script).options(selectinload(Script.actions))
         result = await session.execute(query)
@@ -44,7 +44,7 @@ async def get_current_tasks(session_maker: async_sessionmaker[AsyncSession]) -> 
         return result
 
 
-async def main(sleep_time: int = 1):
+async def main():
     result = await get_current_tasks(async_session_maker)
     print(result)
     await asyncio.gather(*[execute_action(script_action[1], script_action[2], script_action[3],
@@ -54,19 +54,9 @@ async def main(sleep_time: int = 1):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument("-s", '--sleeptime', type=float)
-    args = parser.parse_args()
-    cur_min = datetime.datetime.now().time().minute
-    print(args.sleeptime)
-    if args.sleeptime is not None:
-        while True:
-            if datetime.datetime.now().time().minute != cur_min:
-                cur_min = datetime.datetime.now().time().minute
-                asyncio.run(main(args.sleeptime))
-    else:
-        while True:
-            if datetime.datetime.now().time().minute != cur_min:
-                cur_min = datetime.datetime.now().time().minute
-                asyncio.run(main())
+    cur_sec = datetime.datetime.now().time().second // 5
+    while True:
+        if datetime.datetime.now().time().second // 5 != cur_sec:
+            cur_sec = datetime.datetime.now().time().second // 5
+            asyncio.run(main())
