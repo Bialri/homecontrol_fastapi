@@ -73,6 +73,26 @@ async def get_device_actions(device_id: int,
             'detail': ''}
 
 
+@router.get('/actions/by_id/{action_id}')
+async def get_device_actions(action_id: int,
+                             response_status: Response,
+                             session: AsyncSession = Depends(get_async_session),
+                             authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    query = select(Action).where(Action.id == action_id)
+    result = await session.execute(query)
+    result = result.all()
+    if len(result) == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        return {'status': 'Failed get',
+                'data': '',
+                'detail': 'Wrong action id'}
+    response = ActionResponseSchema.from_orm(result[0][0])
+    return {'status': 'Success get',
+            'data': response,
+            'detail': ''}
+
+
 @router.post('/actions')
 async def create_device(new_action: ActionCreateSchema,
                         response_status: Response,
