@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, Time, Interval
+from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, Time, Interval, Boolean
 from sqlalchemy.orm import relationship, Mapped
 from src.auth.models import user
 from src.database import Base
@@ -38,6 +38,7 @@ scripts = Table(
     Column('id', Integer, autoincrement=True, primary_key=True),
     Column('name', String(100)),
     Column('time', Time),
+    Column('single_execution', Boolean),
     Column('owner_id', Integer, ForeignKey(user.c.id), nullable=True),
     extend_existing=True
 )
@@ -90,6 +91,7 @@ class Script(Base):
     id = Column(Integer, autoincrement=True, primary_key=True)
     name = Column(String(100))
     time = Column(Time)
+    single_execution = Column(Boolean)
     owner_id = Column(Integer, ForeignKey('user.id'))
     owner: Mapped['User'] = relationship(backref='script')
     actions: Mapped[list['ScriptAction']] = relationship(secondary='actions_association_table',

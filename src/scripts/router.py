@@ -1,3 +1,5 @@
+import datetime
+
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import select, delete, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -224,7 +226,7 @@ async def get_script(session: AsyncSession = Depends(get_async_session),
     subject = authorize.get_jwt_subject()
     user = await session.execute(select(User).where(User.username == subject))
     user = user.scalar()
-    query = select(Script).where(Script.owner_id == user.id)
+    query = select(Script).where(Script.owner_id == user.id, Script.single_execution == False)
     result = await session.execute(query)
     result = result.all()
     response = [ScriptResponseSchema.from_orm(script[0]) for script in result]
@@ -241,7 +243,7 @@ async def create_script(new_script: ScriptCreateSchema,
     subject = authorize.get_jwt_subject()
     user = await session.execute(select(User).where(User.username == subject))
     user = user.scalar()
-    script = Script(**new_script.dict(), owner_id=user.id)
+    script = Script(**new_script.dict(), owner_id=user.id, single_execution=False)
     session.add(script)
     await session.commit()
     response = ScriptResponseSchema.from_orm(script).dict()
@@ -257,8 +259,11 @@ async def update_script_action(script_id: int,
                                session: AsyncSession = Depends(get_async_session),
                                authorize: AuthJWT = Depends()):
     authorize.jwt_required()
+    subject = authorize.get_jwt_subject()
+    user = await session.execute(select(User).where(User.username == subject))
+    user = user.scalar()
     query = update(Script).values(**update_script.dict(exclude_none=True)).where(
-        Script.id == script_id)
+        Script.id == script_id, Script.single_execution == False, Script.owner_id == user.id)
     update_result = await session.execute(query)
     if update_result.rowcount == 0:
         response_status.status_code = status.HTTP_400_BAD_REQUEST
@@ -281,20 +286,25 @@ async def delete_script(script_id: int,
                         session: AsyncSession = Depends(get_async_session),
                         authorize: AuthJWT = Depends()):
     authorize.jwt_required()
+    subject = authorize.get_jwt_subject()
+    user = await session.execute(select(User).where(User.username == subject))
+    user = user.scalar()
+    query = select(Script).where(Script.owner_id == user.id)
+    result_security_check = session.execute(query)
     query = select(ActionsAssociation.script_action_id).where(ActionsAssociation.script_id == script_id)
     result_select = await session.execute(query)
     result_select = result_select.all()
 
     query = delete(ActionsAssociation).where(ActionsAssociation.script_id == script_id)
-    result_asociation = await session.execute(query)
+    await session.execute(query)
 
     query = delete(ScriptAction).where(ScriptAction.id
                                        .in_([script_action_id[0] for script_action_id in result_select]))
-    result_script_actions = await session.execute(query)
+    await session.execute(query)
 
     query = delete(Script).where(Script.id == script_id)
     result_scripts = await session.execute(query)
-    if result_scripts.rowcount == 0:
+    if result_scripts.rowcount == 0 or len(result_security_check.all()) == 0:
         response_status.status_code = status.HTTP_400_BAD_REQUEST
         await session.rollback()
         return {'status': 'Failed delete',
@@ -306,8 +316,36 @@ async def delete_script(script_id: int,
             'detail': ''}
 
 
-@router.get('/curtime')
-async def get_curtime(session: AsyncSession = Depends(get_async_session)):
-    result = await session.execute(text('SELECT CURTIME()'))
-    print(result.scalar())
+@router.post('/execute_script/{script_id}')
+async def execute_script(script_id: int,
+                         response_status: Response,
+                         session: AsyncSession = Depends(get_async_session),
+                         authorize: AuthJWT = Depends()):
+    authorize.jwt_required()
+    subject = authorize.get_jwt_subject()
+    user = await session.execute(select(User).where(User.username == subject))
+    user = user.scalar()
+    query = select(Script).options(selectinload(Script.actions)).where(Script.id == script_id,
+                                                                       Script.owner_id == user.id,
+                                                                       Script.single_execution == False)
+    result = await session.execute(query)
+    result = result.all()
+    if len(result) == 0:
+        response_status.status_code = status.HTTP_400_BAD_REQUEST
+        return {'status': 'Failed execute',
+                'data': '',
+                'detail': 'Wrong script_id'}
+    original_script = result[0][0]
+    time = (datetime.datetime.fromtimestamp(datetime.datetime.now().timestamp() // 5 * 5) + datetime.timedelta(
+        seconds=5)).time()
+    script = Script(name=original_script.name,
+                    time=time,
+                    actions=original_script.actions,
+                    owner_id=original_script.owner_id,
+                    single_execution=True)
+    session.add(script)
+    await session.commit()
+    print(datetime.datetime.now())
+    time = datetime.datetime.fromtimestamp(datetime.datetime.now().timestamp() // 5 * 5)
+    print((time + datetime.timedelta(seconds=10)).time())
     return ""
