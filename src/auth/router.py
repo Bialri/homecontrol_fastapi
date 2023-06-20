@@ -10,7 +10,6 @@ from .utils import get_hashed_password, check_password
 from .config import Settings
 
 
-
 router = APIRouter(
     prefix="/auth",
     tags=["Authentification"]
