@@ -2,12 +2,15 @@ from pydantic import BaseModel, validator, ValidationError
 import datetime
 
 
-class DeviceCreateSchema(BaseModel):
+class DeviceBaseSchema(BaseModel):
     name: str
-    secret: str
 
 
-class DevicesResponseSchema(DeviceCreateSchema):
+class DeviceCreateSchema(DeviceBaseSchema):
+    name: str
+
+
+class DevicesResponseSchema(DeviceBaseSchema):
     class Config:
         orm_mode = True
 
@@ -59,10 +62,12 @@ class ScriptActionUpdateSchema(ScriptActionBaseSchema):
 
 class ScriptCreateSchema(BaseModel):
     name: str
-    time: datetime.time
+    time: datetime.time | None
 
     @validator('time')
     def in_multiple_of_5(cls, value):
+        if value is None:
+            return value
         if value.second % 5:
             raise ValidationError("time must be divisible by 5")
         return value
@@ -77,4 +82,3 @@ class ScriptResponseSchema(ScriptCreateSchema):
 
 class ScriptUpdateSchema(ScriptCreateSchema):
     name: str | None
-    time: datetime.time | None
